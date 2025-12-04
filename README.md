@@ -1,53 +1,79 @@
-📘 Customer Churn Prediction System
+```markdown
+# 📘 Customer Churn Prediction System
 
-Machine Learning + FastAPI API + Streamlit UI + Supabase PostgreSQL + Docker
+Machine Learning + FastAPI backend + Streamlit UI + Supabase (Postgres) + Docker
 
-🚀 Overview
+---
 
-This project is a complete end-to-end churn prediction platform, combining:
+## 🚀 Overview
 
-Machine Learning Model (Logistic Regression + ColumnTransformer pipeline)
+An end-to-end churn prediction platform that accepts customer information, persists it to a Supabase PostgreSQL database, runs a pre-trained ML model to predict churn, stores the prediction, and returns results to a Streamlit frontend.
 
-FastAPI Backend for prediction & data storage
+Key components:
+- Scikit-learn model (Logistic Regression + ColumnTransformer pipeline)
+- FastAPI backend (prediction + data storage)
+- Supabase PostgreSQL (UserData and Prediction tables)
+- Streamlit frontend (user input & results)
+- Docker for deployment
 
-Supabase PostgreSQL Database with connected tables
+---
 
-Streamlit Frontend for user input & results
+## Table of Contents
 
-Docker for deployment
+- [Architecture](#architecture)
+- [Database Schema](#database-schema)
+- [FastAPI Workflow](#fastapi-workflow)
+- [API Example](#api-example)
+- [Project Structure](#project-structure)
+- [Local Setup](#local-setup)
+- [Docker Deployment](#docker-deployment)
+- [Environment](#environment)
+- [Future Enhancements](#future-enhancements)
+- [Notes](#notes)
 
-The system:
+---
 
-Accepts customer information
+## Architecture
 
-Saves customer data in UserData table
+User submits customer info via the Streamlit UI → FastAPI validates and upserts UserData → ML model runs prediction → Prediction saved to DB (FK to UserData) → Result returned to UI.
 
-Runs churn prediction
+ASCII relationship:
+```
+UserData.CustomerID   1  ─────────>  many  Prediction.customer_id
+```
 
-Stores prediction in Prediction table
+---
 
-Returns results to Streamlit instant UI
+## Database Schema
 
-🗄️ Database Integration (Supabase)
+Two main tables in Supabase Postgres.
 
-The system now uses Supabase PostgreSQL as the central database with two relational tables, fully connected.
+### 1) UserData (stores customer profile)
+| Column | Type | Description |
+|---|---:|---|
+| CustomerID | String (PK) | Unique customer identifier |
+| gender | String | Male / Female |
+| SeniorCitizen | Integer | 0 or 1 |
+| Partner | String | Yes / No |
+| Dependents | String | Yes / No |
+| tenure | Integer | Months with company |
+| PhoneService | String | Yes / No |
+| MultipleLines | String | ... |
+| InternetService | String | ... |
+| OnlineSecurity | String | ... |
+| OnlineBackup | String | ... |
+| DeviceProtection | String | ... |
+| TechSupport | String | ... |
+| StreamingTV | String | ... |
+| StreamingMovies | String | ... |
+| Contract | String | ... |
+| PaperlessBilling | String | ... |
+| PaymentMethod | String | ... |
+| MonthlyCharges | Float | Monthly charge amount |
+| total_charges | Float | Total charges to date |
 
-📌 1. UserData Table
-
-Stores all customer profile information.
-
-Column	Type	Description
-CustomerID	String (PK)	Unique customer identifier
-gender	String	Male / Female
-SeniorCitizen	Integer	0 or 1
-Partner	String	Yes / No
-Dependents	String	Yes / No
-tenure	Integer	Months with company
-PhoneService	String	Yes / No
-...	...	All remaining churn-related fields
-
-SQLAlchemy model:
-
+SQLAlchemy model (example)
+```py
 class UserData(Base):
     __tablename__ = "UserData"
     CustomerID = Column(String, primary_key=True, index=True)
@@ -73,118 +99,51 @@ class UserData(Base):
 
     # Relationship to predictions
     predictions = relationship("Prediction", back_populates="user")
+```
 
-📌 2. Prediction Table
+### 2) Prediction (stores model outputs)
+| Column | Type | Description |
+|---|---:|---|
+| id | Integer (PK) | Auto-increment |
+| customer_id | String (FK → UserData.CustomerID) | Linked customer |
+| label | String | "Churn" / "Not Churn" |
 
-Stores the churn prediction result for each customer.
-
-Column	Type	Description
-id	Integer (PK)	Auto-increment
-customer_id	String (FK → UserData.CustomerID)	Linked customer
-label	String	Churn / Not Churn
-
-SQLAlchemy model:
-
+SQLAlchemy model (example)
+```py
 class Prediction(Base):
     __tablename__ = "predictions"
-
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(String, ForeignKey("UserData.CustomerID"))
     label = Column(String)
 
     # Relationship link to customer
     user = relationship("UserData", back_populates="predictions")
+```
 
-🔗 Database Relationship
-UserData.CustomerID   1  ─────────>  many  Prediction.customer_id
+---
 
+## FastAPI Workflow (summary)
 
-This means:
+1. Receive input via POST (Pydantic validation).
+2. Upsert UserData row (update if exists, insert if new).
+3. Load preprocessing pipeline + model and generate prediction.
+4. Save prediction row (with FK to user).
+5. Return JSON response to frontend.
 
-Each customer can have multiple predictions
-
-Each prediction is tied to only one customer
-
-⚙️ FastAPI Workflow (Updated)
-✔ 1. Receive input
-
-FastAPI receives customer info validated by Pydantic.
-
-✔ 2. Save / Update UserData
-
-If the customer exists → update row
-If new → insert row
-
-✔ 3. Run ML Model
-
-Prediction is generated using the pre-trained Scikit model.
-
-✔ 4. Save prediction
-
-Result is stored in predictions table with FK.
-
-✔ 5. Respond to Streamlit
-
-Response contains:
-
+Example Response:
+```json
 {
   "CustomerID": 1001,
-  "Label": "Churn",
+  "Label": "Churn"
 }
+```
 
-🖥️ Project Structure
-│   Dockerfile
-│   main.py
-│   .env
-│   requirements.txt
-│   __init__.py
-│   .env   ← Supabase DATABASE_URL stored here
-│
-├── model
-│     ├── logistic_regression_model.pkl
-│     └── model_loading.py
-│
-├── preprocessing
-│     └── pydentic.py
-│
-├── ui
-│     └── frontend.py  (Streamlit UI)
-│
-└── database
-      ├── db.py        (SQLAlchemy engine + Supabase connection)
-      ├── models.py    (UserData + Prediction)
-      └── __init__.py
+---
 
-🔧 Local Setup
-1️⃣ Create a virtual environment
-python -m venv venv
-source venv/bin/activate    # Windows: venv\Scripts\activate
+## API Example (request)
 
-2️⃣ Install dependencies
-pip install -r requirements.txt
-
-3️⃣ Start FastAPI
-uvicorn main:app --reload
-
-4️⃣ Start Streamlit
-streamlit run ui/frontend.py
-
-🐳 Docker Deployment
-Build image:
-docker build -t churn-app .
-
-Run container:
-docker run -p 8000:8000 -p 8501:8501 \
-  --env-file .env \
-  --name churn-container churn-app
-
-
-.env contains:
-
-DATABASE_URL=postgresql+psycopg2://postgres:PASSWORD@db.xyz.supabase.co:5432/postgres
-
-📡 API Example
-Request
+Request body (JSON):
+```json
 {
   "CustomerID": 1002,
   "gender": "Male",
@@ -207,44 +166,121 @@ Request
   "MonthlyCharges": 70.5,
   "total_charges": 1000.0
 }
+```
 
-Response
+Response:
+```json
 {
   "CustomerID": 1002,
-  "Label": "Churn",
+  "Label": "Churn"
 }
+```
 
-🎨 Key Features
+---
 
-✔ Linked database tables (UserData ↔ Prediction)
-✔ FastAPI backend with validation & DB persistence
-✔ Streamlit modern frontend UI
-✔ ML model loading + preprocessing
-✔ Dockerized for easy deployment
-✔ Production-grade PostgreSQL using Supabase
+## Project Structure
+```
+.
+├── Dockerfile
+├── main.py                # FastAPI app
+├── requirements.txt
+├── .env                   # DATABASE_URL (Supabase)
+├── model
+│   ├── logistic_regression_model.pkl
+│   └── model_loading.py
+├── preprocessing
+│   └── pydentic.py
+├── ui
+│   └── frontend.py        # Streamlit UI
+└── database
+    ├── db.py              # SQLAlchemy engine + Supabase connection
+    ├── models.py          # UserData + Prediction models
+    └── __init__.py
+```
 
-🚀 Future Enhancements
+---
 
-Add prediction probability
+## Local Setup
 
-Add timestamps
+1. Create and activate venv
+```bash
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+```
 
-Add user history endpoint
+2. Install dependencies
+```bash
+pip install -r requirements.txt
+```
 
-Display predictions history in Streamlit
+3. Start FastAPI (development)
+```bash
+uvicorn main:app --reload
+```
 
-Admin dashboard
+4. Start Streamlit UI
+```bash
+streamlit run ui/frontend.py
+```
 
-Batch CSV prediction
+---
 
-🏁 Final Notes
+## Docker Deployment
 
-Your application is now fully integrated with Supabase PostgreSQL, with:
+Build:
+```bash
+docker build -t churn-app .
+```
 
-Clean relational structure
+Run:
+```bash
+docker run -p 8000:8000 -p 8501:8501 \
+  --env-file .env \
+  --name churn-container churn-app
+```
 
-Primary → Foreign key mapping
+---
 
-Consistent FastAPI transaction flow
+## Environment (.env example)
 
-ML + UI + API + DB working end-to-end
+Store your Supabase/DB connection here:
+```
+DATABASE_URL=postgresql+psycopg2://postgres:PASSWORD@db.xyz.supabase.co:5432/postgres
+```
+
+Ensure this file is excluded from source control (add to .gitignore).
+
+---
+
+## Key Features
+
+- Linked relational DB tables (UserData ↔ Prediction)
+- FastAPI backend with Pydantic validation and DB persistence
+- Streamlit frontend for interactive predictions
+- ML model loading + preprocessing pipeline
+- Dockerized for easy deployment
+- Production-grade PostgreSQL using Supabase
+
+---
+
+## Future Enhancements
+
+- Return prediction probability (confidence)
+- Add timestamps to records (created_at, updated_at)
+- Expose user history endpoints (list predictions per user)
+- Display prediction history in Streamlit
+- Admin dashboard
+- Batch CSV prediction endpoint
+
+---
+
+## Notes
+
+- The repository currently uses a logistic regression model saved in `model/logistic_regression_model.pkl`.
+- Database models and example schemas are under `database/models.py`.
+- Make sure `DATABASE_URL` is set correctly in `.env` before running the app.
+
+---
+
+Thank you — contributions, bug reports, and feature requests are welcome!
+```
