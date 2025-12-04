@@ -1,32 +1,29 @@
 FROM python:3.11-slim
 
+# Install system deps for psycopg2 + curl for debugging
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Install system libs needed by pandas/numpy
-RUN apt-get update && apt-get install -y \
-    libglib2.0-0 libsm6 libxrender1 libxext6 && \
-    rm -rf /var/lib/apt/lists/*
-COPY . /app
-COPY model/logistic_regression_model.pkl /app/model/logistic_regression_model.pkl
+COPY requirements.txt .
 
+# Upgrade pip
+RUN pip install --upgrade pip
 
+# Install Python deps
+RUN pip install -r requirements.txt
 
-RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
 
-# Remove broken old streamlit executable
-RUN rm -f /usr/local/bin/streamlit
+ENV PYTHONUNBUFFERED=1
 
-# Create new working launcher for Streamlit
-RUN echo '#!/bin/sh\npython3 -m streamlit "$@"' > /usr/local/bin/streamlit && chmod +x /usr/local/bin/streamlit
-
-# ensure python can import model_lr package
-ENV PYTHONPATH="/app"
-
+# Expose FastAPI (8000) and Streamlit (8501)
 EXPOSE 8000
 EXPOSE 8501
 
-CMD ["sh", "-c", "\
-    uvicorn main:app --host 0.0.0.0 --port 8000 & \
-    streamlit run ui/frontend.py --server.address=0.0.0.0 --server.port=8501 \
-"]
-
+# Start both FastAPI + Streamlit
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8000 & streamlit run ui/frontend.py --server.port=8501 --server.address=0.0.0.0"]

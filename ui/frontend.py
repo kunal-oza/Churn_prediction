@@ -10,7 +10,7 @@ st.set_page_config(
     page_icon="📉",
     layout="wide"
 )
-
+st.experimental_set_query_params()
 API_URL = "http://127.0.0.1:8000/predict"
 
 # -------------------------------
@@ -53,7 +53,7 @@ def user_input_features():
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            CustomerID = st.number_input("Customer ID", min_value=1000, step=1, value=1001)
+            CustomerID = st.number_input("Customer ID", key="customer_id", min_value=1000, step=1, value=1001)
             gender = st.selectbox("Gender", ['Male', 'Female'], index=0)
             SeniorCitizen = st.selectbox("Senior Citizen", [0, 1], index=0)
             Partner = st.selectbox("Partner", ['Yes', 'No'], index=1)
@@ -102,7 +102,6 @@ def user_input_features():
         "MonthlyCharges": MonthlyCharges,
         "total_charges": total_charges
     }
-
     return data
 
 
